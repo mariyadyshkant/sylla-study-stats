@@ -1,0 +1,16 @@
+services:
+  study-stats:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - STUDY_STATS_DB_PATH=/data/study_stats.db
+      - STUDY_STATS_EXPORT_PATH=/data/study-stats.json
+    volumes:
+      - ./data:/data
+      # Punta al file esportato da Sylla (Impostazioni -> Backup e dati -> Esporta dati per study-stats).
+      # Esempio: - /Users/<utente>/Library/Application Support/sylla-ai-driven-pj/exports/study-stats.json:/data/study-stats.json:ro
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health')"]
+      interval: 30s
+      retries: 3

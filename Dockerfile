@@ -1,0 +1,26 @@
+FROM python:3.12-slim AS builder
+WORKDIR /build
+COPY requirements.txt .
+RUN pip wheel --no-cache-dir --wheel-dir /wheels -r requirements.txt
+
+FROM python:3.12-slim
+WORKDIR /app
+
+RUN useradd --uid 1000 --create-home appuser
+
+COPY --from=builder /wheels /wheels
+COPY requirements.txt .
+RUN pip install --no-cache-dir --no-index --find-links=/wheels -r requirements.txt \
+    && rm -rf /wheels
+
+COPY app ./app
+COPY static ./static
+COPY ingest.py .
+
+RUN mkdir -p /data && chown -R appuser:appuser /app /data
+USER appuser
+
+EXPOSE 8000
+HEALTHCHECK --interval=30s --retries=3 CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health')"
+
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
