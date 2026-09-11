@@ -1,13 +1,30 @@
-"""Legge study-stats.json (esportato da Sylla) e fa upsert su courses/study_sessions."""
+"""Sincronizza courses/study_sessions dai dati esposti da Sylla.
+
+Due sorgenti supportate:
+- HTTP (default, automatico): GET STUDY_STATS_SOURCE_URL, l'endpoint locale
+  esposto dal processo Electron di Sylla (sempre aggiornato, nessun export manuale).
+- File (fallback): STUDY_STATS_EXPORT_PATH, uno snapshot JSON esportato a mano
+  dall'app (Impostazioni -> Backup e dati -> "Esporta dati per study-stats").
+"""
 
 import json
 import os
 import sys
+import urllib.request
 
 from app.database import SessionLocal, init_db
 from app.models import Course, StudySession
 
-EXPORT_PATH = os.environ.get("STUDY_STATS_EXPORT_PATH", "data/study-stats.json")
+SOURCE_URL = os.environ.get("STUDY_STATS_SOURCE_URL", "http://host.docker.internal:4174/api/v1/study-stats")
+EXPORT_PATH = os.environ.get("STUDY_STATS_EXPORT_PATH")
+
+
+def fetch_payload() -> dict:
+    if EXPORT_PATH:
+        with open(EXPORT_PATH, "r", encoding="utf-8") as f:
+            return json.load(f)
+    with urllib.request.urlopen(SOURCE_URL, timeout=10) as res:
+        return json.load(res)
 
 
 def upsert_course(db, entry: dict) -> Course:
@@ -48,10 +65,9 @@ def upsert_session(db, course_id: int, entry: dict) -> str:
     return "updated" if changed else "unchanged"
 
 
-def run(export_path: str = EXPORT_PATH) -> None:
+def run(payload: dict | None = None) -> dict:
     init_db()
-    with open(export_path, "r", encoding="utf-8") as f:
-        payload = json.load(f)
+    payload = payload if payload is not None else fetch_payload()
 
     db = SessionLocal()
     counters = {"created": 0, "updated": 0, "unchanged": 0}
@@ -66,9 +82,11 @@ def run(export_path: str = EXPORT_PATH) -> None:
     finally:
         db.close()
 
-    print(f"Ingest completato da {export_path}: {counters}")
+    return counters
 
 
 if __name__ == "__main__":
-    path = sys.argv[1] if len(sys.argv) > 1 else EXPORT_PATH
-    run(path)
+    source = sys.argv[1] if len(sys.argv) > 1 else None
+    result = run(json.load(open(source, encoding="utf-8")) if source else None)
+    origin = EXPORT_PATH or SOURCE_URL
+    print(f"Ingest completato da {source or origin}: {result}")

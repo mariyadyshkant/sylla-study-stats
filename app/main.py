@@ -1,3 +1,5 @@
+import asyncio
+import os
 from datetime import date, timedelta
 
 from fastapi import Depends, FastAPI
@@ -5,16 +7,38 @@ from fastapi.staticfiles import StaticFiles
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+import ingest
 from .database import get_db, init_db
 from .models import Course, StudySession
 from .schemas import CourseOut, WeeklyStatOut
 
 app = FastAPI(title="Sylla study-stats")
 
+INGEST_INTERVAL_SECONDS = int(os.environ.get("INGEST_INTERVAL_SECONDS", "300"))
+_ingest_task: asyncio.Task | None = None
+
+
+async def ingest_loop():
+    while True:
+        try:
+            result = await asyncio.to_thread(ingest.run)
+            print(f"[ingest] sync automatica: {result}")
+        except Exception as exc:  # sorgente irraggiungibile: riprova al prossimo giro
+            print(f"[ingest] fallita ({exc}), riprovo tra {INGEST_INTERVAL_SECONDS}s")
+        await asyncio.sleep(INGEST_INTERVAL_SECONDS)
+
 
 @app.on_event("startup")
 def on_startup():
+    global _ingest_task
     init_db()
+    _ingest_task = asyncio.create_task(ingest_loop())
+
+
+@app.on_event("shutdown")
+def on_shutdown():
+    if _ingest_task:
+        _ingest_task.cancel()
 
 
 def week_start(iso_date: str) -> str:

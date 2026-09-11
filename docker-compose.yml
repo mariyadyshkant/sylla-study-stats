@@ -5,11 +5,16 @@ services:
       - "8000:8000"
     environment:
       - STUDY_STATS_DB_PATH=/data/study_stats.db
-      - STUDY_STATS_EXPORT_PATH=/data/study-stats.json
+      # Endpoint locale esposto dal processo Electron di Sylla (bind 127.0.0.1
+      # sulla macchina host). host.docker.internal instrada verso l'host anche
+      # per porte in ascolto solo su loopback (Docker Desktop Mac/Windows).
+      - STUDY_STATS_SOURCE_URL=http://host.docker.internal:4174/api/v1/study-stats
+      - INGEST_INTERVAL_SECONDS=300
+    extra_hosts:
+      # Necessario su Docker Engine nativo (Linux); su Docker Desktop è già automatico.
+      - "host.docker.internal:host-gateway"
     volumes:
       - ./data:/data
-      # Punta al file esportato da Sylla (Impostazioni -> Backup e dati -> Esporta dati per study-stats).
-      # Esempio: - /Users/<utente>/Library/Application Support/sylla-ai-driven-pj/exports/study-stats.json:/data/study-stats.json:ro
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health')"]
       interval: 30s

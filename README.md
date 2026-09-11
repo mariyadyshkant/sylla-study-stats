@@ -6,8 +6,10 @@ svolte) e serve statistiche "quanto ho studiato" via API REST + dashboard intern
 
 Vedi [ADR.md](ADR.md) per le decisioni architetturali e [BRIEF.md](BRIEF.md) per il flow.
 
-Nessuna connessione diretta con il processo Electron: l'unico punto di contatto è il
-file JSON di export, montato in sola lettura nel container.
+Sylla espone in locale (bind `127.0.0.1:4174`, non raggiungibile dalla rete) un
+endpoint `GET /api/v1/study-stats` sempre aggiornato: questo microservizio lo
+interroga automaticamente, a intervalli regolari, senza alcuna azione manuale
+dell'utente né export da parte di Sylla.
 
 ## Setup locale (senza Docker)
 
@@ -16,15 +18,21 @@ python3 -m venv .venv
 .venv/bin/pip install -r requirements.txt
 ```
 
-## Ingestione (manuale)
+## Ingestione
+
+Automatica: all'avvio dell'app FastAPI parte un ciclo in background che chiama
+`STUDY_STATS_SOURCE_URL` ogni `INGEST_INTERVAL_SECONDS` (default 300s) e fa upsert
+su `courses` / `study_sessions`. Nessun comando da lanciare a mano.
+
+Per un'esecuzione singola manuale (debug, o sorgente file invece di API live):
 
 ```bash
+# da API live (default)
+STUDY_STATS_SOURCE_URL=http://127.0.0.1:4174/api/v1/study-stats .venv/bin/python ingest.py
+
+# da uno snapshot esportato a mano da Sylla (Impostazioni -> Backup e dati)
 STUDY_STATS_EXPORT_PATH=./data/study-stats.json .venv/bin/python ingest.py
 ```
-
-Legge il file JSON esportato da Sylla (Impostazioni → Backup e dati → "Esporta dati
-per study-stats") e fa upsert su `courses` / `study_sessions`. Ri-eseguendolo
-sincronizza gli aggiornamenti.
 
 ## API
 
@@ -50,7 +58,8 @@ docker compose exec study-stats python ingest.py
 
 ## Contratto dati (sorgente)
 
-Il file `study-stats.json` prodotto da Sylla ha il formato:
+Sia l'endpoint `GET /api/v1/study-stats` di Sylla sia il file `study-stats.json`
+esportato manualmente restituiscono lo stesso formato:
 
 ```json
 {
