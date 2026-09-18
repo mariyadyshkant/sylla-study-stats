@@ -1,5 +1,7 @@
 # sylla-study-stats
 
+> Componente pianificato dell'ecosistema **[Sylla](https://github.com/mariyadyshkant/sylla-ai-driven-pj)**, l'app desktop per il tracciamento delle lezioni dei corsi seguiti. Sylla stessa è ancora in fase di progettazione (modello dati e architettura definiti, sviluppo non iniziato); questo microservizio è il componente più avanzato lato implementazione, ma prende pieno senso solo una volta che l'app principale esiste ed espone i dati da cui leggere le statistiche.
+
 Microservizio indipendente e containerizzato che ingerisce il file `study-stats.json`
 esportato dall'app desktop [Sylla](../sylla-project) (corsi + lezioni segnate come
 svolte) e serve statistiche "quanto ho studiato" via API REST + dashboard interna.
@@ -87,3 +89,8 @@ static/       dashboard (HTML/CSS/JS, nessun framework)
 ingest.py     pipeline di ingestione da study-stats.json
 data/         study-stats.json (montato da Sylla) + DB SQLite generato
 ```
+
+## Autrice
+ 
+Mariya Dyshkant
+[Portfolio](https://mariyadyshkant.com) · [LinkedIn](https://linkedin.com/in/mariya-dyshkant-45bb411ba)
